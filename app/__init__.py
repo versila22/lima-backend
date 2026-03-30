@@ -1,0 +1,1 @@
+"""LIMA FastAPI application package."""
