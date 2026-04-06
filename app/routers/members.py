@@ -1,19 +1,25 @@
 """Members router — admin management + CSV import."""
 
+from datetime import datetime, timedelta
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_db
+from app.models.alignment import Alignment, AlignmentAssignment, AlignmentEvent
+from app.models.event import Event
 from app.models.member import Member
 from app.models.member_season import MemberSeason
 from app.models.season import Season
+from app.models.venue import Venue
 from app.schemas.member import (
+    MemberPlanning,
+    PlanningEvent,
     ImportMemberReport,
     MemberCreate,
     MemberRead,
@@ -276,3 +282,61 @@ async def import_members(
         db, adherents_bytes, joueurs_bytes, season_id
     )
     return report
+
+
+@router.get("/me/planning", response_model=MemberPlanning)
+async def get_my_planning(
+    current_user: Member = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the current member's planning: upcoming and past show assignments."""
+    from datetime import timezone
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    three_months_ago = now - timedelta(days=90)
+
+    # Query all assignments for this member with event + alignment data
+    stmt = (
+        select(AlignmentAssignment, AlignmentEvent, Event, Alignment)
+        .join(AlignmentEvent, AlignmentAssignment.alignment_event_id == AlignmentEvent.id)
+        .join(Event, AlignmentEvent.event_id == Event.id)
+        .join(Alignment, AlignmentAssignment.alignment_id == Alignment.id)
+        .where(AlignmentAssignment.member_id == current_user.id)
+        .where(Event.start_at >= three_months_ago)
+        .order_by(Event.start_at.asc())
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    upcoming: list[PlanningEvent] = []
+    past: list[PlanningEvent] = []
+
+    for assignment, alignment_event, event, alignment in rows:
+        # Get venue name
+        venue_name = None
+        if event.venue_id:
+            venue = await db.get(Venue, event.venue_id)
+            venue_name = venue.name if venue else None
+
+        pe = PlanningEvent(
+            event_id=event.id,
+            title=event.title,
+            event_type=event.event_type,
+            start_at=event.start_at,
+            end_at=event.end_at,
+            venue_name=venue_name,
+            role=assignment.role,
+            alignment_name=alignment.name,
+            alignment_status=alignment.status,
+        )
+        if event.start_at >= now:
+            upcoming.append(pe)
+        else:
+            past.append(pe)
+
+    past.sort(key=lambda e: e.start_at, reverse=True)
+
+    return MemberPlanning(
+        upcoming=upcoming,
+        past=past,
+        total_shows=len(rows),
+    )
