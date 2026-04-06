@@ -1,10 +1,11 @@
 """Authentication router — login, activation, password management."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
+from app.limiting import limiter
 from app.models.member import Member
 from app.schemas.auth import (
     ActivateAccountRequest,
@@ -17,13 +18,15 @@ from app.schemas.auth import (
 from app.schemas.member import MemberProfileUpdate, MemberRead
 from app.services import auth_service
 from app.utils.deps import get_current_user
-from app.utils.security import create_access_token, verify_password, hash_password
+from app.utils.security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     data: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -56,7 +59,9 @@ async def login(
 
 
 @router.post("/activate", status_code=status.HTTP_200_OK)
+@limiter.limit("5/minute")
 async def activate_account(
+    request: Request,
     data: ActivateAccountRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -73,7 +78,9 @@ async def activate_account(
 
 
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)
+@limiter.limit("3/minute")
 async def forgot_password(
+    request: Request,
     data: ForgotPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ):
