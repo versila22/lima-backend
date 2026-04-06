@@ -5,7 +5,8 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import ForeignKey, Index, String, Text, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -38,7 +39,9 @@ class ShowPlan(Base):
     venue_contact: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
     # Flexible JSON config (players, teams, DJ count, constraints…)
-    config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    config: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSON(), "postgresql"), nullable=False, default=dict
+    )
 
     # Generated markdown plan
     generated_plan: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

@@ -5,6 +5,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +24,13 @@ from app.services import import_service
 from app.utils.deps import get_current_user, require_admin
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+
+class EventCastMember(BaseModel):
+    member_id: UUID
+    first_name: str
+    last_name: str
+    role: str
 
 
 @router.get("", response_model=List[EventRead])
@@ -70,6 +78,39 @@ async def get_event(
     if event.visibility == "admin" and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Accès refusé")
     return event
+
+
+@router.get("/{event_id}/cast", response_model=List[EventCastMember])
+async def get_event_cast(
+    event_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(get_current_user),
+):
+    """Return the cast assignments for a given event."""
+    event_result = await db.execute(select(Event.id).where(Event.id == event_id))
+    if event_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Événement introuvable")
+
+    result = await db.execute(
+        select(
+            AlignmentAssignment.member_id,
+            Member.first_name,
+            Member.last_name,
+            AlignmentAssignment.role,
+        )
+        .join(Member, Member.id == AlignmentAssignment.member_id)
+        .where(AlignmentAssignment.event_id == event_id)
+        .order_by(AlignmentAssignment.role, Member.last_name, Member.first_name)
+    )
+    return [
+        EventCastMember(
+            member_id=member_id,
+            first_name=first_name,
+            last_name=last_name,
+            role=role,
+        )
+        for member_id, first_name, last_name, role in result.all()
+    ]
 
 
 @router.post("", response_model=EventRead, status_code=status.HTTP_201_CREATED)

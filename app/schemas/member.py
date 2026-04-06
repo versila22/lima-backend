@@ -92,6 +92,7 @@ class MemberSummary(BaseModel):
     last_name: str
     app_role: str
     is_active: bool
+    player_status: Optional[Literal["M", "C", "L", "A"]] = None
 
     model_config = {"from_attributes": True}
 

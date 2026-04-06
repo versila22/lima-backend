@@ -12,6 +12,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.member import Member
 from app.models.member_season import MemberSeason
+from app.models.season import Season
 from app.schemas.member import (
     ImportMemberReport,
     MemberCreate,
@@ -48,13 +49,49 @@ async def list_members(
 
     Any authenticated user can access this endpoint.
     """
-    query = select(Member)
+    effective_season_id = season_id
+    if effective_season_id is None:
+        current_season_result = await db.execute(
+            select(Season).where(Season.is_current.is_(True)).limit(1)
+        )
+        current_season = current_season_result.scalar_one_or_none()
+        effective_season_id = current_season.id if current_season else None
+
+    query = select(Member).options(selectinload(Member.member_seasons))
     if is_active is not None:
         query = query.where(Member.is_active == is_active)
     if season_id is not None:
         query = query.join(MemberSeason).where(MemberSeason.season_id == season_id)
     result = await db.execute(query.order_by(Member.last_name, Member.first_name))
-    return result.scalars().all()
+    members = result.scalars().unique().all()
+
+    summaries = []
+    for member in members:
+        player_status = None
+        if effective_season_id is not None:
+            season_entry = next(
+                (
+                    ms
+                    for ms in member.member_seasons
+                    if ms.season_id == effective_season_id
+                ),
+                None,
+            )
+            if season_entry is not None:
+                player_status = season_entry.player_status
+
+        summaries.append(
+            MemberSummary(
+                id=member.id,
+                email=member.email,
+                first_name=member.first_name,
+                last_name=member.last_name,
+                app_role=member.app_role,
+                is_active=member.is_active,
+                player_status=player_status,
+            )
+        )
+    return summaries
 
 
 @router.get("/{member_id}", response_model=MemberRead)

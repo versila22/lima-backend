@@ -20,8 +20,10 @@ SKIPPED_PATHS = {"/health", "/docs", "/redoc", "/openapi.json"}
 
 
 class ActivityTrackerMiddleware(BaseHTTPMiddleware):
+    enabled: bool = True
+
     async def dispatch(self, request: Request, call_next):
-        if request.url.path in SKIPPED_PATHS:
+        if not self.enabled or request.url.path in SKIPPED_PATHS:
             return await call_next(request)
 
         started_at = time.perf_counter()

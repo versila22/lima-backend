@@ -11,7 +11,8 @@ Calendar Excel:
 
 import io
 import logging
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
@@ -19,13 +20,15 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.event import Event
 from app.models.member import Member
 from app.models.member_season import MemberSeason
 from app.models.season import Season
 from app.models.venue import Venue
 from app.schemas.event import CalendarImportReport
-from app.schemas.member import ImportMemberReport
+from app.schemas.member import ImportMemberReport, MemberSummary
+from app.services.email_service import send_activation_email
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +197,7 @@ async def import_csv_helloasso(
                 select(Member).where(Member.email == email)
             )
             member = existing.scalar_one_or_none()
+            is_new_member = member is None
 
             if member is None:
                 member = Member(
@@ -204,6 +208,8 @@ async def import_csv_helloasso(
                     address=adh.get("address"),
                     postal_code=adh.get("postal_code"),
                     city=adh.get("city"),
+                    activation_token=secrets.token_urlsafe(32),
+                    activation_expires_at=datetime.now(timezone.utc) + timedelta(days=7),
                 )
                 db.add(member)
                 await db.flush()  # Get ID
@@ -243,7 +249,14 @@ async def import_csv_helloasso(
                 if helloasso_ref:
                     ms.helloasso_ref = helloasso_ref
 
-            from app.schemas.member import MemberSummary
+            if is_new_member and settings.SMTP_HOST and member.activation_token:
+                await send_activation_email(
+                    to=member.email,
+                    first_name=member.first_name,
+                    token=member.activation_token,
+                    base_url=settings.FRONTEND_URL,
+                )
+
             report.members.append(
                 MemberSummary(
                     id=member.id,
@@ -252,6 +265,7 @@ async def import_csv_helloasso(
                     last_name=member.last_name,
                     app_role=member.app_role,
                     is_active=member.is_active,
+                    player_status=player_status,
                 )
             )
 
