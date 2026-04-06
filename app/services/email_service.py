@@ -1,4 +1,4 @@
-"""Async email service for activation and password reset emails."""
+"""Async email service for member notifications and account emails."""
 
 import logging
 from email.message import EmailMessage
@@ -102,3 +102,79 @@ async def send_password_reset_email(
     </html>
     """
     await send_email(to, "LIMA — Réinitialisation de mot de passe", html_body)
+
+
+async def send_cast_assignment_email(
+    to: str,
+    first_name: str,
+    event_title: str,
+    event_date: str,
+    role: str,
+    alignment_name: str,
+    base_url: str,
+) -> None:
+    """Send a cast assignment notification email."""
+    planning_link = f"{base_url.rstrip('/')}/mon-planning"
+    subject = f"LIMA — Tu es affecté(e) à {event_title}"
+    html_body = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+        <p>Bonjour {first_name},</p>
+        <p>
+          Tu as été affecté(e) au rôle <strong>{role}</strong>
+          pour l'événement <strong>{event_title}</strong>.
+        </p>
+        <p>
+          <strong>Date :</strong> {event_date}<br>
+          <strong>Grille :</strong> {alignment_name}
+        </p>
+        <p style="margin: 24px 0;">
+          <a
+            href="{planning_link}"
+            style="background: #7c3aed; color: white; text-decoration: none; padding: 12px 18px; border-radius: 8px; display: inline-block;"
+          >
+            Voir mon planning
+          </a>
+        </p>
+        <p>
+          Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br>
+          <a href="{planning_link}">{planning_link}</a>
+        </p>
+      </body>
+    </html>
+    """
+    await send_email(to, subject, html_body)
+
+
+async def send_cast_unassignment_email(
+    to: str,
+    first_name: str,
+    event_title: str,
+    event_date: str,
+    role: str,
+    alignment_name: str,
+    base_url: str,
+) -> None:
+    """Send a cast unassignment notification email."""
+    planning_link = f"{base_url.rstrip('/')}/mon-planning"
+    subject = f"LIMA — Mise à jour de ton affectation pour {event_title}"
+    html_body = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+        <p>Bonjour {first_name},</p>
+        <p>
+          Tu n'es plus affecté(e) au rôle <strong>{role}</strong>
+          pour l'événement <strong>{event_title}</strong>.
+        </p>
+        <p>
+          <strong>Date :</strong> {event_date}<br>
+          <strong>Grille :</strong> {alignment_name}
+        </p>
+        <p>
+          Tu peux consulter ton planning mis à jour ici :
+          <a href="{planning_link}">{planning_link}</a>
+        </p>
+      </body>
+    </html>
+    """
+    await send_email(to, subject, html_body)

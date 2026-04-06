@@ -1,14 +1,17 @@
 """Alignments router — grilles d'alignement."""
 
+from datetime import datetime
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
-from app.models.alignment import Alignment
+from app.models.alignment import Alignment, AlignmentAssignment
+from app.models.event import Event
 from app.models.member import Member
 from app.schemas.alignment import (
     AddEventsRequest,
@@ -20,9 +23,17 @@ from app.schemas.alignment import (
     AssignRequest,
 )
 from app.services import alignment_service
+from app.services.email_service import (
+    send_cast_assignment_email,
+    send_cast_unassignment_email,
+)
 from app.utils.deps import get_current_user, require_admin
 
 router = APIRouter(prefix="/alignments", tags=["alignments"])
+
+
+def _format_event_date(start_at: datetime) -> str:
+    return start_at.strftime("%d/%m/%Y à %H:%M")
 
 
 @router.get("", response_model=List[AlignmentRead])
@@ -164,6 +175,7 @@ async def remove_event(
 async def assign_member(
     alignment_id: UUID,
     data: AssignRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     _: Member = Depends(require_admin),
 ):
@@ -178,6 +190,30 @@ async def assign_member(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    member_result = await db.execute(select(Member).where(Member.id == assignment.member_id))
+    member = member_result.scalar_one_or_none()
+
+    event_result = await db.execute(select(Event).where(Event.id == assignment.event_id))
+    event = event_result.scalar_one_or_none()
+
+    alignment_result = await db.execute(
+        select(Alignment).where(Alignment.id == assignment.alignment_id)
+    )
+    alignment = alignment_result.scalar_one_or_none()
+
+    if member and event and alignment and member.email:
+        background_tasks.add_task(
+            send_cast_assignment_email,
+            to=member.email,
+            first_name=member.first_name,
+            event_title=event.title,
+            event_date=_format_event_date(event.start_at),
+            role=assignment.role,
+            alignment_name=alignment.name,
+            base_url=settings.FRONTEND_URL,
+        )
+
     return assignment
 
 
@@ -188,14 +224,48 @@ async def assign_member(
 async def remove_assignment(
     alignment_id: UUID,
     assignment_id: UUID,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     _: Member = Depends(require_admin),
 ):
     """Remove a player assignment from a grid (admin only)."""
+    existing_result = await db.execute(
+        select(AlignmentAssignment).where(
+            AlignmentAssignment.id == assignment_id,
+            AlignmentAssignment.alignment_id == alignment_id,
+        )
+    )
+    assignment = existing_result.scalar_one_or_none()
+    if assignment is None:
+        raise HTTPException(status_code=400, detail="Affectation introuvable")
+
+    member_result = await db.execute(select(Member).where(Member.id == assignment.member_id))
+    member = member_result.scalar_one_or_none()
+
+    event_result = await db.execute(select(Event).where(Event.id == assignment.event_id))
+    event = event_result.scalar_one_or_none()
+
+    alignment_result = await db.execute(
+        select(Alignment).where(Alignment.id == assignment.alignment_id)
+    )
+    alignment = alignment_result.scalar_one_or_none()
+
     try:
         await alignment_service.remove_assignment(db, alignment_id, assignment_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    if member and event and alignment and member.email:
+        background_tasks.add_task(
+            send_cast_unassignment_email,
+            to=member.email,
+            first_name=member.first_name,
+            event_title=event.title,
+            event_date=_format_event_date(event.start_at),
+            role=assignment.role,
+            alignment_name=alignment.name,
+            base_url=settings.FRONTEND_URL,
+        )
 
 
 @router.put("/{alignment_id}/publish", response_model=AlignmentRead)
