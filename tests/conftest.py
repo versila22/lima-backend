@@ -184,7 +184,18 @@ async def seeded_data():
         await session.flush()
 
         session.add_all([
-            MemberSeason(member_id=regular.id, season_id=current_season.id, player_status="M"),
+            MemberSeason(
+                member_id=regular.id,
+                season_id=current_season.id,
+                player_status="M",
+                asso_role="trésorier",
+            ),
+            MemberSeason(
+                member_id=regular.id,
+                season_id=old_season.id,
+                player_status="C",
+                asso_role="secrétaire",
+            ),
             MemberSeason(member_id=admin.id, season_id=current_season.id, player_status="A"),
         ])
 
@@ -240,6 +251,14 @@ async def seeded_data():
             AlignmentEvent(alignment_id=draft_alignment.id, event_id=public_event.id, sort_order=0),
             AlignmentEvent(alignment_id=published_alignment.id, event_id=public_event.id, sort_order=0),
         ])
+
+        session.add(
+            MemberCommission(
+                member_id=regular.id,
+                commission_id=commission.id,
+                season_id=current_season.id,
+            )
+        )
 
         session.add(
             ShowPlan(

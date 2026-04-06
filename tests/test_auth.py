@@ -155,7 +155,12 @@ async def test_get_me_returns_profile(regular_client, seeded_data):
     response = await regular_client.get("/auth/me")
 
     assert response.status_code == 200
-    assert response.json()["email"] == "member@example.com"
+    body = response.json()
+    assert body["email"] == "member@example.com"
+    assert body["player_status"] == "M"
+    assert body["asso_role"] == "trésorier"
+    assert body["commissions"] == ["Communication"]
+    assert body["season_history"][0]["season_name"] == "2025-2026"
 
 
 @pytest.mark.asyncio

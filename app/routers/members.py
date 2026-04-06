@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.database import get_db
 from app.models.alignment import Alignment, AlignmentAssignment, AlignmentEvent
+from app.models.commission import Commission, MemberCommission
 from app.models.event import Event
 from app.models.member import Member
 from app.models.member_season import MemberSeason
@@ -22,10 +23,12 @@ from app.schemas.member import (
     PlanningEvent,
     ImportMemberReport,
     MemberCreate,
+    MemberProfileRead,
     MemberRead,
     MemberRoleUpdate,
     MemberSummary,
     MemberUpdate,
+    SeasonHistoryEntry,
 )
 from app.services import auth_service, import_service
 from app.services.email_service import send_activation_email
@@ -37,10 +40,75 @@ router = APIRouter(prefix="/members", tags=["members"])
 async def _get_member_for_response(db: AsyncSession, member_id: UUID) -> Member:
     result = await db.execute(
         select(Member)
-        .options(selectinload(Member.member_seasons))
+        .options(selectinload(Member.member_seasons).selectinload(MemberSeason.season))
         .where(Member.id == member_id)
     )
     return result.scalar_one()
+
+
+async def _build_member_profile(db: AsyncSession, member_id: UUID) -> MemberProfileRead:
+    member = await _get_member_for_response(db, member_id)
+
+    current_season_result = await db.execute(
+        select(Season).where(Season.is_current.is_(True)).limit(1)
+    )
+    current_season = current_season_result.scalar_one_or_none()
+
+    current_membership = None
+    if current_season is not None:
+        current_membership = next(
+            (ms for ms in member.member_seasons if ms.season_id == current_season.id),
+            None,
+        )
+
+    commission_names: list[str] = []
+    if current_season is not None:
+        commissions_result = await db.execute(
+            select(Commission.name)
+            .join(MemberCommission, MemberCommission.commission_id == Commission.id)
+            .where(
+                MemberCommission.member_id == member_id,
+                MemberCommission.season_id == current_season.id,
+            )
+            .order_by(Commission.name)
+        )
+        commission_names = list(commissions_result.scalars().all())
+
+    base_payload = MemberRead.model_validate(member).model_dump()
+    base_payload["member_seasons"] = [
+        {
+            **season_payload,
+            "season_name": member_season.season.name if member_season.season else None,
+        }
+        for season_payload, member_season in zip(
+            base_payload["member_seasons"], member.member_seasons
+        )
+    ]
+    base_payload["player_status"] = (
+        current_membership.player_status if current_membership else None
+    )
+    base_payload["asso_role"] = current_membership.asso_role if current_membership else None
+    base_payload["commissions"] = commission_names
+    base_payload["season_history"] = [
+        SeasonHistoryEntry(
+            season_id=member_season.season_id,
+            season_name=(
+                member_season.season.name if member_season.season else "Saison inconnue"
+            ),
+            player_status=member_season.player_status,
+            asso_role=member_season.asso_role,
+        ).model_dump()
+        for member_season in sorted(
+            member.member_seasons,
+            key=lambda ms: (
+                ms.season.start_date if ms.season else datetime.min.date(),
+                ms.created_at,
+            ),
+            reverse=True,
+        )
+    ]
+
+    return MemberProfileRead(**base_payload)
 
 
 @router.get("", response_model=List[MemberSummary])
@@ -100,6 +168,29 @@ async def list_members(
     return summaries
 
 
+@router.get("/{member_id}/profile", response_model=MemberProfileRead)
+async def get_member_profile(
+    member_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: Member = Depends(get_current_user),
+):
+    """Retrieve the enriched profile of a member.
+
+    A member can view their own profile; admins can view any member.
+    """
+    if not current_user.is_admin and current_user.id != member_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès réservé à votre profil",
+        )
+
+    result = await db.execute(select(Member.id).where(Member.id == member_id))
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Membre introuvable")
+
+    return await _build_member_profile(db, member_id)
+
+
 @router.get("/{member_id}", response_model=MemberRead)
 async def get_member(
     member_id: UUID,
@@ -109,7 +200,7 @@ async def get_member(
     """Retrieve full details of a member by ID."""
     result = await db.execute(
         select(Member)
-        .options(selectinload(Member.member_seasons))
+        .options(selectinload(Member.member_seasons).selectinload(MemberSeason.season))
         .where(Member.id == member_id)
     )
     member = result.scalar_one_or_none()
