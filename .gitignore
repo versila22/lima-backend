@@ -12,5 +12,5 @@ build/
 *.egg
 .mypy_cache/
 .pytest_cache/
-alembic/versions/*.py
+alembic/versions/__pycache__/
 !alembic/versions/.gitkeep
