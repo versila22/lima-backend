@@ -170,3 +170,16 @@ async def get_login_attempts(
         ],
         attempts=[LoginAttemptRead.model_validate(item) for item in attempts_result.scalars().all()],
     )
+
+
+@router.post("/reminders/send", tags=["admin"])
+async def trigger_reminders(
+    db: AsyncSession = Depends(get_db),
+    _: Member = Depends(require_admin),
+):
+    """Trigger 24h reminder emails for events happening tomorrow (admin only)."""
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+    from scripts.send_reminders import send_due_reminders
+    sent, failed = await send_due_reminders(db)
+    return {"sent": sent, "failed": failed, "total": sent + failed}
