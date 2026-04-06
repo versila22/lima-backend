@@ -31,19 +31,19 @@ class Settings(BaseSettings):
     # App
     APP_ENV: str = "development"
     DEBUG: bool = False
-    FRONTEND_URL: str = "http://localhost:5173"
+    FRONTEND_URL: str = "https://improv-cabaret-planner.lovable.app"
 
     # CORS
     # Production must set CORS_ORIGINS explicitly via environment variables.
     CORS_ORIGINS: Union[str, List[str]] = DEFAULT_CORS_ORIGINS
 
     # Email
-    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    EMAIL_FROM: str = "LIMA <noreply@lima-impro.fr>"
-    EMAIL_ENABLED: bool = False
+    SMTP_FROM: str = "noreply@lima.asso.fr"
+    SMTP_TLS: bool = True
 
     # Server
     PORT: int = 8000

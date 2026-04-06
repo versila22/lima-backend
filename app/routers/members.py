@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.database import get_db
 from app.models.member import Member
 from app.models.member_season import MemberSeason
@@ -20,6 +21,7 @@ from app.schemas.member import (
     MemberUpdate,
 )
 from app.services import auth_service, import_service
+from app.services.email_service import send_activation_email
 from app.utils.deps import get_current_user, require_admin
 
 router = APIRouter(prefix="/members", tags=["members"])
@@ -109,8 +111,13 @@ async def create_member(
     await db.flush()
 
     # Generate activation token
-    await auth_service.generate_activation_token(db, member)
-    # TODO: Send activation email
+    token = await auth_service.generate_activation_token(db, member)
+    await send_activation_email(
+        to=member.email,
+        first_name=member.first_name,
+        token=token,
+        base_url=settings.FRONTEND_URL,
+    )
 
     return await _get_member_for_response(db, member.id)
 
@@ -183,7 +190,12 @@ async def resend_activation(
         )
 
     token = await auth_service.generate_activation_token(db, member)
-    # TODO: Send email with token
+    await send_activation_email(
+        to=member.email,
+        first_name=member.first_name,
+        token=token,
+        base_url=settings.FRONTEND_URL,
+    )
     return {"detail": "Email d'activation envoyé", "token": token}
 
 

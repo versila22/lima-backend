@@ -19,6 +19,7 @@ from app.schemas.auth import (
 )
 from app.schemas.member import MemberProfileUpdate, MemberRead
 from app.services import auth_service
+from app.services.email_service import send_password_reset_email
 from app.utils.deps import get_current_user
 from app.utils.security import create_access_token, hash_password, verify_password
 
@@ -100,8 +101,14 @@ async def forgot_password(
 
     Always returns 200 (no email enumeration).
     """
-    await auth_service.request_password_reset(db, data.email)
-    # TODO: send email when SMTP is configured
+    member = await auth_service.request_password_reset(db, data.email)
+    if member is not None and member.reset_token is not None:
+        await send_password_reset_email(
+            to=member.email,
+            first_name=member.first_name,
+            token=member.reset_token,
+            base_url=settings.FRONTEND_URL,
+        )
     return {"detail": "Si cet email existe, un lien de réinitialisation a été envoyé"}
 
 
