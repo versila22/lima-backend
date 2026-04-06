@@ -20,7 +20,7 @@
 - 🎭 **Show Alignments** — Cast assignment grid (players, MJ, MC, DJ, Coach, Referee per show)
 - 🎪 **Show Plans** — Flexible show configuration with JSON metadata
 - 📊 **Activity Tracking** — Per-user request logging, admin analytics dashboard (DAU, top pages, errors)
-- 📧 **Email Service** — Async SMTP (aiosmtplib), activation & password reset emails
+- 📧 **Email Service** — Async SMTP (aiosmtplib), activation, password reset, and 24h reminder emails
 - 🛡️ **Rate Limiting** — slowapi on all auth endpoints
 - 🔍 **Admin Stats API** — Recent activity, login stats, daily active users
 
@@ -155,6 +155,26 @@ FRONTEND_URL=https://limaimpro.duckdns.org
 ```
 
 Railway auto-deploys on push to `main`. Migration runs automatically at startup (`alembic upgrade head`).
+
+### Scheduled reminder emails
+
+A daily script sends reminder emails to members assigned to **published** events happening in the next 24 hours.
+
+```bash
+cd /data/.openclaw/workspace/lima/backend
+python scripts/send_reminders.py
+```
+
+Recommended setup:
+- run it once per day via cron or Railway scheduled job
+- keep `SMTP_*` variables configured so emails are actually delivered
+- keep `FRONTEND_URL` pointing to the public members app so the email CTA opens `/mon-planning`
+
+Example cron (every day at 09:00):
+
+```cron
+0 9 * * * cd /data/.openclaw/workspace/lima/backend && /usr/bin/python3 scripts/send_reminders.py >> /var/log/lima-reminders.log 2>&1
+```
 
 ---
 

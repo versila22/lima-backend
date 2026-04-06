@@ -178,3 +178,50 @@ async def send_cast_unassignment_email(
     </html>
     """
     await send_email(to, subject, html_body)
+
+
+async def send_event_reminder_email(
+    to: str,
+    first_name: str,
+    event_title: str,
+    event_date: str,
+    role: str,
+    venue_name: str | None,
+    base_url: str,
+) -> None:
+    """Send a 24h reminder email for an upcoming assigned event."""
+    planning_link = f"{base_url.rstrip('/')}/mon-planning"
+    subject = f"LIMA — Rappel : {event_title} demain"
+    venue_block = (
+        f"<strong>Lieu :</strong> {venue_name}<br>" if venue_name else ""
+    )
+    html_body = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+        <p>Bonjour {first_name},</p>
+        <p>
+          Petit rappel : tu es attendu(e) demain pour l'événement
+          <strong>{event_title}</strong>.
+        </p>
+        <p>
+          <strong>Date :</strong> {event_date}<br>
+          <strong>Rôle :</strong> {role}<br>
+          {venue_block}
+        </p>
+        <p style="margin: 24px 0;">
+          <a
+            href="{planning_link}"
+            style="background: #7c3aed; color: white; text-decoration: none; padding: 12px 18px; border-radius: 8px; display: inline-block;"
+          >
+            Voir mon planning
+          </a>
+        </p>
+        <p>
+          Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br>
+          <a href="{planning_link}">{planning_link}</a>
+        </p>
+        <p>À très vite sur scène 🎭</p>
+      </body>
+    </html>
+    """
+    await send_email(to, subject, html_body)

@@ -101,6 +101,12 @@ async def client():
 
 
 @pytest_asyncio.fixture
+async def db_session():
+    async with TestingSessionLocal() as session:
+        yield session
+
+
+@pytest_asyncio.fixture
 async def seeded_data():
     async with TestingSessionLocal() as session:
         admin = Member(
