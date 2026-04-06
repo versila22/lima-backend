@@ -25,6 +25,15 @@ from app.utils.deps import get_current_user, require_admin
 router = APIRouter(prefix="/members", tags=["members"])
 
 
+async def _get_member_for_response(db: AsyncSession, member_id: UUID) -> Member:
+    result = await db.execute(
+        select(Member)
+        .options(selectinload(Member.member_seasons))
+        .where(Member.id == member_id)
+    )
+    return result.scalar_one()
+
+
 @router.get("", response_model=List[MemberSummary])
 async def list_members(
     season_id: Optional[UUID] = Query(None, description="Filtrer par saison"),
@@ -103,7 +112,7 @@ async def create_member(
     await auth_service.generate_activation_token(db, member)
     # TODO: Send activation email
 
-    return member
+    return await _get_member_for_response(db, member.id)
 
 
 @router.put("/{member_id}", response_model=MemberRead)
@@ -138,7 +147,7 @@ async def update_member(
     for field, value in update_data.items():
         setattr(member, field, value)
     await db.flush()
-    return member
+    return await _get_member_for_response(db, member.id)
 
 
 @router.delete("/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -192,7 +201,7 @@ async def update_member_role(
         raise HTTPException(status_code=404, detail="Membre introuvable")
     member.app_role = data.app_role
     await db.flush()
-    return member
+    return await _get_member_for_response(db, member.id)
 
 
 @router.post("/import", response_model=ImportMemberReport)

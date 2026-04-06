@@ -1,11 +1,11 @@
 """Admin router for activity monitoring."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import Date, Float, and_, case, cast, distinct, func, select
+from sqlalchemy import Float, and_, case, cast, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -24,6 +24,17 @@ from app.schemas.activity import (
 from app.utils.deps import require_admin
 
 router = APIRouter(tags=["admin"])
+
+
+def _utcnow_naive() -> datetime:
+    """Return naive UTC datetimes to match SQLite TIMESTAMP behavior."""
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _normalize_day(value: str | date) -> date:
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(value)
 
 
 @router.get("/activity/recent", response_model=List[ActivityLogRead])
@@ -55,7 +66,7 @@ async def get_activity_stats(
     _: Member = Depends(require_admin),
 ):
     """Return aggregate activity statistics for the given period."""
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    since = _utcnow_naive() - timedelta(days=days)
     base_filter = ActivityLog.created_at >= since
 
     total_requests = await db.scalar(
@@ -87,14 +98,15 @@ async def get_activity_stats(
         .limit(10)
     )
 
+    activity_day = func.date(ActivityLog.created_at)
     daily_active_users_result = await db.execute(
         select(
-            cast(func.date_trunc("day", ActivityLog.created_at), Date).label("day"),
+            activity_day.label("day"),
             func.count(distinct(ActivityLog.user_id)).label("unique_users"),
         )
         .where(base_filter, ActivityLog.user_id.is_not(None))
-        .group_by(func.date_trunc("day", ActivityLog.created_at))
-        .order_by(func.date_trunc("day", ActivityLog.created_at))
+        .group_by(activity_day)
+        .order_by(activity_day)
     )
 
     return ActivityStatsResponse(
@@ -103,7 +115,7 @@ async def get_activity_stats(
         top_endpoints=[EndpointStat(path=path, count=count) for path, count in top_endpoints_result.all()],
         error_endpoints=[EndpointStat(path=path, count=count) for path, count in error_endpoints_result.all()],
         daily_active_users=[
-            DailyActiveUserStat(day=day, unique_users=unique_users)
+            DailyActiveUserStat(day=_normalize_day(day), unique_users=unique_users)
             for day, unique_users in daily_active_users_result.all()
         ],
         avg_response_time_ms=round(float(avg_response_time_ms or 0), 2),
@@ -117,7 +129,7 @@ async def get_login_attempts(
     _: Member = Depends(require_admin),
 ):
     """Return login attempts and success/failure summary for the given period."""
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    since = _utcnow_naive() - timedelta(days=days)
     login_filter = and_(
         ActivityLog.created_at >= since,
         ActivityLog.method == "POST",

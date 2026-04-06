@@ -76,6 +76,7 @@ async def create_alignment(
     )
     db.add(alignment)
     await db.flush()
+    await db.refresh(alignment)
     return alignment
 
 
@@ -96,6 +97,7 @@ async def update_alignment(
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(alignment, field, value)
     await db.flush()
+    await db.refresh(alignment)
     return alignment
 
 
@@ -211,4 +213,5 @@ async def publish_alignment(
         raise HTTPException(status_code=404, detail="Grille introuvable")
     alignment.status = "published"
     await db.flush()
+    await db.refresh(alignment)
     return alignment

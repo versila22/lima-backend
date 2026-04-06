@@ -78,6 +78,7 @@ async def create_season(
     )
     db.add(season)
     await db.flush()
+    await db.refresh(season)
     return season
 
 
@@ -103,4 +104,5 @@ async def update_season(
     for field, value in update_data.items():
         setattr(season, field, value)
     await db.flush()
+    await db.refresh(season)
     return season

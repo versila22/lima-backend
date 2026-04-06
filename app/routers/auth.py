@@ -1,7 +1,9 @@
 """Authentication router — login, activation, password management."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_db
@@ -21,6 +23,15 @@ from app.utils.deps import get_current_user
 from app.utils.security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+async def _get_member_for_response(db: AsyncSession, member_id) -> Member:
+    result = await db.execute(
+        select(Member)
+        .options(selectinload(Member.member_seasons))
+        .where(Member.id == member_id)
+    )
+    return result.scalar_one()
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -124,7 +135,7 @@ async def update_me(
     for field, value in update_data.items():
         setattr(current_user, field, value)
     await db.flush()
-    return current_user
+    return await _get_member_for_response(db, current_user.id)
 
 
 @router.put("/me/password", status_code=status.HTTP_200_OK)

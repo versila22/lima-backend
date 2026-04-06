@@ -8,6 +8,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.member import Member
@@ -38,7 +39,11 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    result = await db.execute(select(Member).where(Member.id == UUID(user_id)))
+    result = await db.execute(
+        select(Member)
+        .options(selectinload(Member.member_seasons))
+        .where(Member.id == UUID(user_id))
+    )
     member = result.scalar_one_or_none()
 
     if member is None:

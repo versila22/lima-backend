@@ -5,12 +5,14 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models.alignment import AlignmentAssignment, AlignmentEvent
 from app.models.event import Event
 from app.models.member import Member
+from app.models.show_plan import ShowPlan
 from app.schemas.event import (
     CalendarImportReport,
     EventCreate,
@@ -80,6 +82,7 @@ async def create_event(
     event = Event(**data.model_dump())
     db.add(event)
     await db.flush()
+    await db.refresh(event)
     return event
 
 
@@ -98,6 +101,7 @@ async def update_event(
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(event, field, value)
     await db.flush()
+    await db.refresh(event)
     return event
 
 
@@ -112,6 +116,11 @@ async def delete_event(
     event = result.scalar_one_or_none()
     if event is None:
         raise HTTPException(status_code=404, detail="Événement introuvable")
+    await db.execute(
+        delete(AlignmentAssignment).where(AlignmentAssignment.event_id == event_id)
+    )
+    await db.execute(delete(AlignmentEvent).where(AlignmentEvent.event_id == event_id))
+    await db.execute(delete(ShowPlan).where(ShowPlan.event_id == event_id))
     await db.delete(event)
     await db.flush()
 
