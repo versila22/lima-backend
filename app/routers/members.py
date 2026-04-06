@@ -1,6 +1,5 @@
 """Members router — admin management + CSV import."""
 
-import uuid
 from typing import List, Optional
 from uuid import UUID
 

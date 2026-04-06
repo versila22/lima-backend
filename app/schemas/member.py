@@ -5,7 +5,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr
 
 
 # ---------- MemberSeason ----------

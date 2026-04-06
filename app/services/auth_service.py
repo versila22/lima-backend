@@ -3,12 +3,10 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.models.member import Member
 from app.utils.security import (
     generate_secure_token,

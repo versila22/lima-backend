@@ -6,10 +6,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models.alignment import Alignment, AlignmentEvent, AlignmentAssignment
+from app.models.alignment import Alignment
 from app.models.member import Member
 from app.schemas.alignment import (
     AddEventsRequest,

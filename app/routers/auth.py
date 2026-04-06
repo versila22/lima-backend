@@ -82,7 +82,7 @@ async def forgot_password(
 
     Always returns 200 (no email enumeration).
     """
-    member = await auth_service.request_password_reset(db, data.email)
+    await auth_service.request_password_reset(db, data.email)
     # TODO: send email when SMTP is configured
     return {"detail": "Si cet email existe, un lien de réinitialisation a été envoyé"}
 

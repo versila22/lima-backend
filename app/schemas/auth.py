@@ -1,6 +1,5 @@
 """Auth-related Pydantic schemas."""
 
-from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
 
 

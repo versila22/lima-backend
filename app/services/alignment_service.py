@@ -11,7 +11,6 @@ from sqlalchemy.orm import selectinload
 from app.models.alignment import Alignment, AlignmentAssignment, AlignmentEvent
 from app.models.event import Event
 from app.models.member import Member
-from app.models.member_season import MemberSeason
 
 logger = logging.getLogger(__name__)
 

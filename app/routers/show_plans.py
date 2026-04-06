@@ -39,7 +39,7 @@ async def list_show_plans(
     else:
         # Default to current season
         season_result = await db.execute(
-            select(Season).where(Season.is_current == True)
+            select(Season).where(Season.is_current)
         )
         current_season = season_result.scalar_one_or_none()
         if current_season:

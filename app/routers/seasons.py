@@ -32,7 +32,7 @@ async def get_current_season(
     _: Member = Depends(get_current_user),
 ):
     """Return the season marked as current."""
-    result = await db.execute(select(Season).where(Season.is_current == True))
+    result = await db.execute(select(Season).where(Season.is_current))
     season = result.scalar_one_or_none()
     if season is None:
         raise HTTPException(

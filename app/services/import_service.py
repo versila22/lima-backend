@@ -194,7 +194,6 @@ async def import_csv_helloasso(
                 select(Member).where(Member.email == email)
             )
             member = existing.scalar_one_or_none()
-            created = member is None
 
             if member is None:
                 member = Member(
