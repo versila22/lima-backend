@@ -13,6 +13,9 @@ from app.database import Base
 
 class Alignment(Base):
     __tablename__ = "alignments"
+    __table_args__ = (
+        Index("ix_alignments_season_status", "season_id", "status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, String, Text, func
+from sqlalchemy import Boolean, Date, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,6 +13,11 @@ from app.database import Base
 
 class Member(Base):
     __tablename__ = "members"
+    __table_args__ = (
+        Index("ix_members_activation_token", "activation_token"),
+        Index("ix_members_reset_token", "reset_token"),
+        Index("ix_members_app_role", "app_role"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
