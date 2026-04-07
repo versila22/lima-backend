@@ -1,0 +1,21 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lima-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - traefik_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lima-api.rule=Host(`lima-api.duckdns.org`)"
+      - "traefik.http.routers.lima-api.entrypoints=websecure"
+      - "traefik.http.routers.lima-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.lima-api.loadbalancer.server.port=8000"
+
+networks:
+  traefik_default:
+    external: true
