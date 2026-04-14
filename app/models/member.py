@@ -31,6 +31,7 @@ class Member(Base):
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     postal_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    photo_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # App role
     app_role: Mapped[str] = mapped_column(

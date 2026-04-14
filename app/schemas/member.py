@@ -37,11 +37,13 @@ class MemberBase(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
+    photo_url: Optional[str] = None
     phone: Optional[str] = None
     date_of_birth: Optional[date] = None
     address: Optional[str] = None
     postal_code: Optional[str] = None
     city: Optional[str] = None
+    photo_url: Optional[str] = None
 
 
 class MemberCreate(MemberBase):
@@ -57,6 +59,7 @@ class MemberUpdate(BaseModel):
     address: Optional[str] = None
     postal_code: Optional[str] = None
     city: Optional[str] = None
+    photo_url: Optional[str] = None
 
 
 class MemberProfileUpdate(BaseModel):
@@ -68,6 +71,7 @@ class MemberProfileUpdate(BaseModel):
     address: Optional[str] = None
     postal_code: Optional[str] = None
     city: Optional[str] = None
+    photo_url: Optional[str] = None
 
 
 class MemberRoleUpdate(BaseModel):
@@ -94,6 +98,7 @@ class MemberSummary(BaseModel):
     email: str
     first_name: str
     last_name: str
+    photo_url: Optional[str] = None
     app_role: str
     is_active: bool
     player_status: Optional[Literal["M", "C", "L", "A"]] = None
